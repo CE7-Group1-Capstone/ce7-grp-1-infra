@@ -27,6 +27,18 @@ resource "helm_release" "prome" {
 
   values = [tostring(file("${path.cwd}${var.prome_info["value_path"]}"))]
 
+  set {
+    name = "server.persistentVolume.existingClaim"
+    value = "kube-prometheus-stack-pvc"
+    type = "string"
+  }
+
+  set {
+    name = "grafana.persistentVolume.existingClaim"
+    value = "kube-prometheus-stack-pvc"
+    type = "string"
+  }
+
 }
 
 resource "time_sleep" "wait_30_seconds" {

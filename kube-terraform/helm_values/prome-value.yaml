@@ -1,11 +1,11 @@
 grafana:
-  persistence:
-    enabled: true
-    type: pvc
-    storageClassName: gp2
-    accessModes:
-      - ReadWriteOnce
-    size: 10Gi
+  # persistence:
+  #   enabled: true
+  #   type: pvc
+  #   storageClassName: gp2
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   size: 10Gi
   ingress:
     enabled: true
     ingressClassName: nginx
