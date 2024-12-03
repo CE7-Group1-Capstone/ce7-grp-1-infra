@@ -27,7 +27,7 @@ resource "helm_release" "prome" {
 
   values = [tostring(file("${path.cwd}${var.prome_info["value_path"]}"))]
 
-set {
+  set {
     name  = "server.persistentVolume.enabled"
     value = true
     # type  = "string"
