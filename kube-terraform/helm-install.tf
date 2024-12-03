@@ -30,13 +30,13 @@ resource "helm_release" "prome" {
   set {
     name  = "server.persistentVolume.existingClaim"
     value = "kube-prometheus-stack-pvc"
-    type  = "string"
+    # type  = "string"
   }
 
   set {
     name  = "grafana.persistentVolume.existingClaim"
     value = "kube-prometheus-stack-pvc"
-    type  = "string"
+    # type  = "string"
   }
 
 }
