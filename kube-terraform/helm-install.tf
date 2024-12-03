@@ -46,7 +46,7 @@ resource "helm_release" "helm-install" {
   namespace  = var.helm_info[count.index][4]
 
 
-  values = (var.helm_info[count.index][5] == "" ? [] : [template("${path.cwd}${var.helm_info[count.index][5]}")])
+  values = (var.helm_info[count.index][5] == "" ? [] : [file("${path.cwd}${var.helm_info[count.index][5]}")])
   # values = [tostring(file("${path.cwd}/helm_values/prome-value.yaml"))]
 
   depends_on = [time_sleep.wait_30_seconds]
