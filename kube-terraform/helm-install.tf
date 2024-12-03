@@ -25,10 +25,10 @@ resource "helm_release" "prome" {
   force_update     = tobool(var.prome_info["force_update"])
   namespace        = var.prome_info["namespace"]
   recreate_pods    = true
-  cleanup_on_fail           = true
-  wait_for_jobs              = true
-  verify                     = true 
-  
+  cleanup_on_fail  = true
+  wait_for_jobs    = true
+  verify           = true
+
 
 
 
