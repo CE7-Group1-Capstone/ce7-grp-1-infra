@@ -3,5 +3,5 @@ loki:
     tag: 2.9.7
   persistence:
     enabled: true
-    storageClassName: # insert storage class for the data volume
+    storageClassName: gp2 # insert storage class for the data volume
     size: 20Gi
