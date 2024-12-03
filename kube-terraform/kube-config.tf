@@ -45,10 +45,10 @@ resource "kubectl_manifest" "custom_rules" {
 }
 
 resource "kubectl_manifest" "pv" {
-  yaml_body = tostring("${path.cwd}/kube_manifest/kube-prometheus-stack-pv.yaml")
+  yaml_body = tostring(file("${path.cwd}/kube_manifest/kube-prometheus-stack-pv.yaml"))
 }
 
 
 resource "kubectl_manifest" "pvc" {
-  yaml_body = tostring("${path.cwd}/kube_manifest/kube-prometheus-stack-pvc.yaml")
+  yaml_body = tostring(file("${path.cwd}/kube_manifest/kube-prometheus-stack-pvc.yaml"))
 }
