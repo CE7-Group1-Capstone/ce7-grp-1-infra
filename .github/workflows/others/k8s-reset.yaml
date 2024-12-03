@@ -1,0 +1,155 @@
+name: k8s cluster reset
+
+on:
+  workflow_dispatch:
+#   push:
+#     branches: 
+#       - dev
+#     paths:
+#       - k8s/**
+#       - .github/workflows/k8s-config.yaml
+#   workflow_run:
+#     workflows: ["Terraform Checks and Apply"]
+#     types:
+#       - completed
+  # pull_request:
+  #   branches: [ "main" ]
+
+
+jobs:
+  delete-route53-record:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+    defaults:
+      run:
+        working-directory: k8s/templates
+
+    steps:
+      - uses: actions/checkout@v3
+  
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.EKS_REGION }}
+  
+      - name: Connect to EKS Cluster
+        run: |
+            aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+
+      - name: Get load balancer FQDN
+        run: |
+            kubectl get svc
+            echo "LB_ADDR=$(kubectl get svc | grep -ie loadbalancer | grep -ie ${{ vars.NGINX_NAME }} | awk '{print $4}')" >> $GITHUB_ENV
+
+      - name: Get aws Zone ID
+        run: |
+            echo "ZONE_ID=$(aws route53 list-hosted-zones | jq --arg name "${{ vars.ZONE_NAME }}" | grep Id | awk -F'[:"/]' '{print $7}')" >> $GITHUB_ENV
+
+      - name: Get Loadbalancer ZoneNameID
+        run: |
+            echo "LB_ZONE_ID=$(aws elb describe-load-balancers | jq '.LoadBalancerDescriptions | .[] | select(.DNSName == "${{ env.LB_ADDR }}") | .CanonicalHostedZoneNameID' | awk -F'["]' '{print $2}')" >> $GITHUB_ENV
+
+      - name: Generate record json file
+        run: |
+            sed -i 's/<ACTION>/DELETE/' delete-dns-record.json
+            sed -i 's/<FQDN>/${{ format('{0}.{1}', vars.SITE_NAME, vars.ZONE_NAME) }}/' delete-dns-record.json
+            sed -i 's/<LB_ZONE_ID>/${{ env.LB_ZONE_ID }}/' delete-dns-record.json
+            sed -i 's/<LB_ADDR>/${{ format('dualstack.{0}', env.LB_ADDR) }}/' delete-dns-record.json
+            sudo cat delete-dns-record.json
+        working-directory: k8s/templates
+
+      - name: Delete A record
+        run: |
+            aws route53 change-resource-record-sets --hosted-zone-id ${{ env.ZONE_ID }} --change-batch file://delete-dns-record.json
+        working-directory: k8s/templates
+
+
+  k8s-reset:
+    needs: [delete-route53-record]
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+    # defaults:
+    #   run:
+    #     working-directory: k8s
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.EKS_REGION }}
+
+    - name: Connect to EKS Cluster
+      run: |
+          aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+
+    - name: List cluster information
+      run: |
+          kubectl get pods
+          kubectl get svc
+          kubectl get ingress
+
+    - name: List helm releases
+      run: |
+          touch ./helm_remove.txt
+          # sudo helm repo update
+          helm list | awk '{print $1}' > helm_remove.txt
+          sudo tail -n +2 helm_remove.txt > helm_remove.tmp
+          sudo mv helm_remove.tmp helm_remove.txt
+          cat helm_remove.txt
+
+    - name: helm delete
+      run: |
+          for i in `cat helm_remove.txt`; do echo $i; helm uninstall $i; done
+
+
+      
+
+  Summary:
+    needs: [k8s-reset, delete-route53-record]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adding markdown
+        run: |
+          k8s_INIT=${{ needs.k8s-initialize.outputs.status }}
+          record_DELETE=${{ needs.Delete-route53-record.outputs.status }}
+
+          echo '##  Preparing Build Summary ' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo "| Job Name        | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| k8s-reset  | $k8s_INIT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Delete-route53-record  | $record_DELETE |" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo '## Job ran by: ${{ github.actor }}' >> $GITHUB_STEP_SUMMARY
+
+
+    # - name: Run script file
+    #   run: |
+    #        chmod +x ./public/scripts/test.sh
+    #        ./public/scripts/test.sh
+    #   shell: bash
+
+    # - name: Pause 15min to verify bucket creation
+    #   run: sleep 900
+
+    # - name: Terraform destroy
+    #   run: terraform destroy -auto-approve
+
+
+    # References: 
+    # Bash elseif in step https://thomasthornton.cloud/2023/08/11/if-elseif-or-else-in-github-actions/
+    # Share variable between jobs https://medium.com/@leroyleowdev/github-actions-ways-to-share-data-between-jobs-4267ff9ac2ce
+    # Event triggered workflow https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#workflow_run
+    # For external repo clone? https://stackoverflow.com/questions/57612428/cloning-private-github-repository-within-organisation-in-actions
+    # Continue step even if error https://stackoverflow.com/questions/69182773/exclude-an-exit-code-in-github-actions-workflow-result-status
+

@@ -35,3 +35,7 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# ignore following workflows
+./git/.github/workflows/terraform-checks.yaml
+./git/.github/workflows/terrafrom-apply.yaml

@@ -1,0 +1,10 @@
+ - host: <SVC_NAME>.<SITE_NAME>.<ZONE_NAME>
+   http:
+     paths:
+     - path: / # < play with this
+       pathType: Prefix
+       backend:
+         service:
+           name: <SVC_NAME>
+           port:
+             number: <SVC_PORT>

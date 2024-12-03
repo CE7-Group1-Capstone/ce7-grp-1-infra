@@ -1,0 +1,40 @@
+# name: Ingress rules creation
+
+# on:
+#   workflow_dispatch:
+#   # pull_request:
+#   #   branches: [ "main" ]
+#   push:
+#     branches: 
+#       - dev
+#     paths:
+#       - kube-terraform/**
+#       - .github/workflows/k8s-terra.yaml
+
+# jobs:
+#   Ingress-creation:
+#     runs-on: ubuntu-latest
+#     outputs:
+#       status: ${{ job.status }}
+#     defaults:
+#       run:
+#         working-directory: k8s
+
+#     steps:
+#     - name: Checkout
+#       uses: actions/checkout@v3
+
+#     - name: Configure AWS credentials
+#       uses: aws-actions/configure-aws-credentials@v3
+#       with:
+#         aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         aws-region: ${{ vars.EKS_REGION }}
+
+#     - name: Get kubernetes context
+#       run: |
+#           aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+
+#     - name: Get cluster service information
+#       run: |
+#           kubectl get svc

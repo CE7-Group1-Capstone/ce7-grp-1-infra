@@ -1,0 +1,6 @@
+mapUsers: |
+  - userarn: arn:aws:iam::255945442255:user/junjie24
+    username: junjie24
+    groups:
+      - system:masters
+  

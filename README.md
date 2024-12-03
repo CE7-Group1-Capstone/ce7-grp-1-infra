@@ -1,1 +1,1 @@
-# ce7-grp-1-infra
+# CAP-Stone

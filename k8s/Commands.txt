@@ -1,0 +1,20 @@
+aws eks update-kubeconfig --name ce7-ty-eks --region us-east-1
+kubectl apply -f ingress-ctl.yaml
+
+#kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v0.5.1/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml
+#kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v0.5.1/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml
+#kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v0.5.1/config/crd/experimental/gateway.networking.k8s.io_referencegrants.yaml
+
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+
+
+
+# To delete all CRDs
+kubectl delete crds --all
+
+# To list resource 
+kubectl get <resource>
+    resources : HTTPRoute, ingress, gateway
+
+# To delete resources
+kubectl delete <resource> <resource-name>

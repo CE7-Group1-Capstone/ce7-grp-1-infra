@@ -1,0 +1,262 @@
+name: Kube config check and apply
+
+on:
+  workflow_dispatch:
+  # pull_request:
+  #   branches: [ "main" ]
+  push:
+    branches: 
+      - dev
+    paths:
+      - kube-terraform/**
+      # - .github/workflows/k8s-terra.yaml
+  # workflow_run:
+  #   workflows: ["Terraform Checks and Apply"]
+  #   types:
+  #     - completed
+
+jobs:
+  Terraform-Checks:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+    defaults:
+      run:
+        working-directory: kube-terraform
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.EKS_REGION }}
+
+    # - name: Get kubernetes context
+    #   run: |
+    #       aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+
+    - name: Terraform fmt
+      id: fmt
+      run: terraform fmt -check
+
+    # Please change your secrets accordingly
+    - name: Replace backend.tf variables
+      run: |
+          sed -i 's/<KUBE_BUCKET_NAME>/${{ secrets.KUBE_BUCKET_NAME }}/' ./backend.tf
+          sed -i 's/<KUBE_BUCKET_KEY>/${{ secrets.KUBE_BUCKET_KEY }}/' ./backend.tf
+          sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./backend.tf
+          sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./data.tf
+          sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./data.tf
+          sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./data.tf
+          cat ./data.tf
+          sed -i 's/<AWS_ACCESS_KEY>/${{ secrets.AWS_SECRET_ACCESS_ID }}/' ./helm_values/prome-value.yaml
+          sed -i 's/<AWS_SECRET_KEY>/${{ secrets.AWS_SECRET_ACCESS_KEY }}/' ./helm_values/prome-value.yaml
+          cat ./helm_values/prome-value.yaml
+
+    - name: Terraform validate init
+      id: init
+      run: terraform init -backend=false
+
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate -no-color
+
+    - uses: terraform-linters/setup-tflint@v3
+      with:
+        tflint_version: latest
+    
+    - name: Show version
+      run: tflint --version
+
+    - name: Init TFLint
+      run: tflint --init
+
+    - name: Run TFLint
+      run: tflint -f compact
+
+    # - name: Export terraform outputs
+    #   id: tfout
+    #   run: |
+    #     terraform output
+
+  Terraform-Apply:
+    needs: Terraform-Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kube-terraform
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.EKS_REGION }}
+
+      - name: Get kubernetes context
+        run: |
+            aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+
+      # Please change your secrets accordingly
+      - name: Replace backend.tf variables
+        run: |
+            sed -i 's/<KUBE_BUCKET_NAME>/${{ secrets.KUBE_BUCKET_NAME }}/' ./backend.tf
+            sed -i 's/<KUBE_BUCKET_KEY>/${{ secrets.KUBE_BUCKET_KEY }}/' ./backend.tf
+            sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./backend.tf
+            cat ./backend.tf
+            sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./data.tf
+            sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./data.tf
+            sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./data.tf
+            cat ./data.tf
+            sed -i 's/<AWS_ACCESS_KEY>/${{ secrets.AWS_SECRET_ACCESS_ID }}/' ./helm_values/prome-value.yaml
+            sed -i 's/<AWS_SECRET_KEY>/${{ secrets.AWS_SECRET_ACCESS_KEY }}/' ./helm_values/prome-value.yaml
+            cat ./helm_values/prome-value.yaml
+
+      - name: Terraform init
+        run: terraform init
+
+      # - name: Terraform plan
+      #   run: terraform plan -target=data.aws_eks_cluster.ce7-ty-eks
+
+      # - name: Terraform apply
+      #   run: terraform apply -auto-approve -target=data.aws_eks_cluster.ce7-ty-eks
+
+      - name: Terraform plan
+        run: terraform plan
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve
+
+      - name: Export terraform outputs
+        id: tfout
+        run: |
+           terraform output -json
+
+      - name: helm rbac tempalte
+        run: | 
+            cat externaldns-rbac.yaml
+        working-directory: kube-terraform/helm_values/templates
+          
+#          echo "TERRA_APPLY_ROLE_ARN=$(terraform output -json | jq '."externaldns-role-arn".value')" >> $GITHUB_OUTPUT
+#          echo "TERRA_APPLY_SA_NAME=$(terraform output -json | jq '."externaldns-sa-name".value')" >> $GITHUB_OUTPUT
+#          echo "TERRA_APPLY_ROLE_NAMESPACE=$(terraform output -json | jq '."externaldns-role-namespace".value')" >> $GITHUB_OUTPUT
+
+    # outputs:
+    #   terra_apply_outout_role_arn: ${{ steps.tfout.outputs.TERRA_APPLY_ROLE_ARN }}
+    #   terra_apply_outout_sa_name: ${{ steps.tfout.outputs.TERRA_APPLY_SA_NAME }}
+    #   terra_apply_outout_role_namespace: ${{ steps.tfout.outputs.TERRA_APPLY_ROLE_NAMESPACE }}
+    #   status: ${{ job.status }}
+
+      # - name: Pause 15min to verify bucket creation
+      #   run: sleep 900
+
+      # - name: Terraform destroy
+      #   run: terraform destroy -auto-approve
+
+  # Helm-install-externaldns_rbac:
+  #   needs: Terraform-Apply
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: k8s
+
+  #   steps:
+  #   - uses: actions/checkout@v3
+
+  #   - name: Configure AWS credentials
+  #     uses: aws-actions/configure-aws-credentials@v3
+  #     with:
+  #       aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+  #       aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       aws-region: ${{ vars.EKS_REGION }}
+
+  #   - name: Get kubernetes context
+  #     run: |
+  #         aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+    
+  #   - name: Echo job variable from terraform
+  #     run: |
+  #         echo "This role arn: ${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_arn }}"
+  #         echo "This sa name: ${{ needs.Terraform-Apply.outputs.terra_apply_outout_sa_name }}"
+  #         echo "This is role namespace: ${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_namespace }}"
+
+  #   # - name: Create kubernetes cluster special account and associate it to aws externaldns role
+  #   #   run: |
+  #   #       kubectl create serviceaccount ${{ needs.Terraform-Apply.outputs.terra_apply_outout_sa_name }} --namespace ${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_namespace }}
+  #   #       kubectl patch serviceaccount ${{ needs.Terraform-Apply.outputs.terra_apply_outout_sa_name }} --namespace ${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_namespace }} --patch "{\"metadata\": { \"annotations\": { \"eks.amazonaws.com/role-arn\": \"${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_arn }}\" }}}"
+
+  #   - name: Generate helm rbac.yaml file
+  #     run: |
+  #         sed -i 's/<AWS_ACC_ID>/$(aws sts get-caller-identity --query Account --output text)/' ./externaldns-rbac.yaml
+  #         sed -i 's/<EXTERNALDNS_ROLE_NAME>/${{ needs.Terraform-Apply.outputs.terra_apply_outout_sa_name }}/' ./externaldns-rbac.yaml
+  #         cat ./externaldns-rbac.yaml
+
+  #   - name: Helm repo add externaldns by Kubernetes-sigs
+  #     run: |
+  #         helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+
+  #   - name: Helm install externaldns with value file
+  #     run: |
+  #         helm upgrade --install external-dns external-dns/external-dns --values externaldns-rbac.yaml
+
+  Temporary_Static_Ingress:
+    needs: Terraform-Apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: k8s
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.EKS_REGION }}
+
+    - name: Get kubernetes context
+      run: |
+          aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+
+    - name: Apply Static Ingress Rules
+      run: |
+          kubectl apply -f ingress-manual.yaml
+
+  Summary:
+    needs: [Terraform-Checks, Terraform-Apply, Temporary_Static_Ingress] #, Helm-install-externaldns_rbac]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adding markdown
+        run: |
+          INFO1=${{ needs.Terraform-Checks.outputs.status }}
+          INFO2=${{ needs.Terraform-Apply.outputs.status }}
+          INFO3=${{ needs.Helm-install-externaldns_rbac.outputs.status }}
+
+          echo '##  Preparing Build Summary ' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo "| Job Name        | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform-Checks  | $INFO1 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform-Apply  | $INFO2 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Helm-install-externaldns_rbac  | $INFO3 |" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo '## Job ran by: ${{ github.actor }}' >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+ name: ty-ingress
+ namespace: default
+spec:
+ ingressClassName: nginx
+ rules:
+ - host: mlops.ce7-grp-1.sctp-sandbox.com
+   http:
+     paths:
+     - path: / # < play with this
+       pathType: Prefix
+       backend:
+         service:
+           name: fastapi-svc
+           port:
+             number: 80
+#  - host: grafana.ce7-grp-1.sctp-sandbox.com
+#    http:
+#      paths:
+#      - path: / # < play with this
+#        pathType: Prefix
+#        backend:
+#          service:
+#            name: ty-prome-grafana
+#            port:
+#              number: 80
+#  - host: prometheus.ce7-grp-1.sctp-sandbox.com
+#    http:
+#      paths:
+#      - path: / # < play with this
+#        pathType: Prefix
+#        backend:
+#          service:
+#            name: ty-prome-kube-prometheus-s-operator
+#            port:
+#              number: 443

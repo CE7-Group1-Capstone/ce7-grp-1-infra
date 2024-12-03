@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+ name: hello-route-ty
+ namespace: default
+spec:
+ parentRefs:
+ - name: hello-ty
+ hostnames:
+ - "ce7-ty-alb-265429261.us-east-1.elb.amazonaws.com"
+ rules:
+ - matches:
+   - path:
+       type: PathPrefix
+       value: /
+ - backendRefs:
+   - name: hello-ty
+     port: 80

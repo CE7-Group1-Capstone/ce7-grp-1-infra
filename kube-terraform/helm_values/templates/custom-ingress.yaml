@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+ name: ${ingress-rule-name}
+ namespace: ${namespace}
+spec:
+ ingressClassName: nginx
+ rules:
+ - host: ${service-url}.ce7-grp-1.sctp-sandbox.com
+   http:
+     paths:
+     - path: / # < play with this
+       pathType: Prefix
+       backend:
+         service:
+           name: ${service-name}
+           port:
+             number: ${service-port}
+
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#  name: ty-ingress
+#  namespace: default
+# spec:
+#  ingressClassName: nginx
+#  rules:
+#  - host: mlops.ce7-grp-1.sctp-sandbox.com
+#    http:
+#      paths:
+#      - path: / # < play with this
+#        pathType: Prefix
+#        backend:
+#          service:
+#            name: fastapi-svc
+#            port:
+#              number: 80

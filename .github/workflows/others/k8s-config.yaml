@@ -1,0 +1,172 @@
+name: k8s cluster initialization
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: 
+  #     - dev
+  #   paths:
+  #     - k8s/**
+  #     - .github/workflows/k8s-config.yaml
+  # workflow_run:
+  #   workflows: ["Terraform Checks and Apply"]
+  #   types:
+  #     - completed
+  # pull_request:
+  #   branches: [ "main" ]
+
+
+jobs:
+  k8s-initialize:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+    defaults:
+      run:
+        working-directory: k8s
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.EKS_REGION }}
+
+    - name: Connect to EKS Cluster
+      run: |
+          aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+
+    - name: Check if nginx is installed in k8s cluster
+      id: nginx_check
+      continue-on-error: true
+      run: |
+          echo "NGINX_CHECK=$(helm ls | grep -i ${{ vars.NGINX_NAME }} | wc -l)" >> $GITHUB_ENV
+
+    - name: Check if prometheus is installed in k8s cluster
+      id: prome_check
+      continue-on-error: true
+      run: |
+          echo "PROME_CHECK=$(helm ls | grep -i ${{ vars.PROME_NAME }} | wc -l)" >> $GITHUB_ENV
+
+    # - name: Installing HELM
+    #   if: ${{ env.NGINX_CHECK == 0 || env.PROME_CHECK == 0 }}
+    #   run: |
+    #       curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+    #       sudo apt-get install apt-transport-https --yes
+    #       echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+    #       sudo apt-get update
+    #       sudo apt-get install helm
+
+    - name: Installing nginx to k8s cluster
+      if: ${{ env.NGINX_CHECK == 0 }}
+      run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo update
+          helm install ${{ vars.NGINX_NAME }} ingress-nginx/ingress-nginx
+
+    - name: Installing prometheus to k8s cluster
+      if: ${{ env.PROME_CHECK == 0 }}
+      run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm install ${{ vars.PROME_NAME }} prometheus-community/kube-prometheus-stack
+
+    - name: Check for NGINX ingress
+      run: |
+          echo "INGRESS_CHECK=$(kubectl get ingress | grep -ie ${{ vars.INGRESS_NAME }} | wc -l)" >> $GITHUB_ENV
+
+    - name: Delete NGINX ingress
+      if: ${{ env.INGRESS_CHECK != 0 }}
+      run: |
+          kubectl delete ingress ${{ vars.INGRESS_NAME }}
+
+    - name: Get Grafana pod information
+      run: |
+          echo "GRAF_POD_NAME=$(kubectl get svc | grep -ie grafana | grep -ie ${{ vars.PROME_NAME }} | awk '{print $1}')" >> $GITHUB_ENV
+          echo "GRAF_POD_PORT=$(kubectl get svc | grep -ie grafana | grep -ie ${{ vars.PROME_NAME }} | awk '{print $5}' | awk -F/ '{print $1}')" >> $GITHUB_ENV
+
+      # Replace host line with LB address
+      # Replace service name with Grafana pod name
+    - name: Kubectl apply ingress
+      run: |
+          sed  -i 's/<INGRESS_NAME>/${{ vars.INGRESS_NAME }}/' ./ingress.yaml
+          sed -i 's/<FQDN>/${{ format('{0}.{1}', vars.SITE_NAME, vars.ZONE_NAME) }}/' ./ingress.yaml
+          sed -i 's/<GRAF_NAME>/${{ env.GRAF_POD_NAME }}/' ./ingress.yaml
+          # sed -i 's/<GRAF_PATH>/${{ env.GRAF_POD_NAME }}/' ./ingress.yaml
+          sed -i 's/<GRAF_PORT>/${{ env.GRAF_POD_PORT }}/' ./ingress.yaml
+          cat ./ingress.yaml
+          kubectl apply -f ./ingress.yaml
+
+    - name: Get Grafana default password
+      run: |
+          kubectl get secret --namespace default $(kubectl get svc | grep -i grafana | awk '{print $1}') -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+    - name: Get load balancer FQDN
+      run: |
+          echo "LB_ADDR=$(kubectl get svc | grep -ie loadbalancer | grep -ie ${{ vars.NGINX_NAME }} | awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Get aws Zone ID
+      run: |
+          aws route53 list-hosted-zones
+          echo "ZONE_ID=$(aws route53 list-hosted-zones | jq --arg name "${{ vars.ZONE_NAME }}" | grep Id | awk -F'[:"/]' '{print $7}')" >> $GITHUB_ENV
+
+    - name: Get Loadbalancer ZoneNameID
+      run: |
+          echo "LB_ZONE_ID=$(aws elb describe-load-balancers | jq '.LoadBalancerDescriptions | .[] | select(.DNSName == "${{ env.LB_ADDR }}") | .CanonicalHostedZoneNameID' | awk -F'["]' '{print $2}')" >> $GITHUB_ENV
+
+    - name: Generate record json file
+      run: |
+          sed -i 's/<ACTION>/CREATE/' create-dns-record.json
+          sed -i 's/<FQDN>/${{ format('{0}.{1}', vars.SITE_NAME, vars.ZONE_NAME) }}/' create-dns-record.json
+          sed -i 's/<LB_ZONE_ID>/${{ env.LB_ZONE_ID }}/' create-dns-record.json
+          sed -i 's/<LB_ADDR>/${{ format('dualstack.{0}', env.LB_ADDR) }}/' create-dns-record.json
+          sudo cat create-dns-record.json
+      working-directory: k8s/templates
+
+    - name: Create A record
+      run: |
+          aws route53 change-resource-record-sets --hosted-zone-id ${{ env.ZONE_ID }} --change-batch file://create-dns-record.json
+      working-directory: k8s/templates
+
+  Summary:
+    needs: [k8s-initialize]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adding markdown
+        run: |
+          k8s_INIT=${{ needs.k8s-initialize.outputs.status }}
+
+          echo '##  Preparing Build Summary ' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo "| Job Name        | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| k8s-initialize  | $k8s_INIT |" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo '## Job ran by: ${{ github.actor }}' >> $GITHUB_STEP_SUMMARY
+
+
+    # - name: Run script file
+    #   run: |
+    #        chmod +x ./public/scripts/test.sh
+    #        ./public/scripts/test.sh
+    #   shell: bash
+
+    # - name: Pause 15min to verify bucket creation
+    #   run: sleep 900
+
+    # - name: Terraform destroy
+    #   run: terraform destroy -auto-approve
+
+
+    # References: 
+    # Bash elseif in step https://thomasthornton.cloud/2023/08/11/if-elseif-or-else-in-github-actions/
+    # Share variable between jobs https://medium.com/@leroyleowdev/github-actions-ways-to-share-data-between-jobs-4267ff9ac2ce
+    # Event triggered workflow https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#workflow_run
+    # For external repo clone? https://stackoverflow.com/questions/57612428/cloning-private-github-repository-within-organisation-in-actions
+    # Continue step even if error https://stackoverflow.com/questions/69182773/exclude-an-exit-code-in-github-actions-workflow-result-status
+

@@ -1,0 +1,71 @@
+grafana:
+  # serviceAccount:
+    # create: true
+    # name: ${service_account_name}
+    # annotations: 
+    #   eks.amazonaws.com/role-arn: ${aws_assume_role_arn}
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: ["grafana.ce7-grp-1.sctp-sandbox.com"]
+  additionalDataSources: 
+    - name: Loki
+      type: loki
+      access: proxy
+      jsonData:
+          timeout: 60
+          maxLines: 1000
+      url: http://ce7-grp-1-loki.loki.svc.cluster.local:3100
+    - name: CloudWatch
+      type: cloudwatch
+      jsonData:
+        authType: keys
+        defaultRegion: us-east-1
+      secureJsonData:
+        accessKey: <AWS_ACCESS_KEY>
+        secretKey: <AWS_SECRET_KEY>
+      editable: true
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: ["prometheus.ce7-grp-1.sctp-sandbox.com"]
+alertmanager:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: ["alertmanager.ce7-grp-1.sctp-sandbox.com"]
+  # config:
+  #   route: 
+  #     group_by: ['alertname']
+  #     group_wait: 30s
+  #     group_interval: 5m
+  #     repeat_interval: 12h
+  #     receiver: 'null'
+  #     routes:
+  #     - receiver: 'null'
+  #       matchers:
+  #         - alertname = "Watchdog"
+  #     - receiver: "null"
+  #       matchers:
+  #         - alertname =~ "UnusedCpu|UnusedMemory"
+  #     - receiver: "discord-noresolved"
+  #       matchers:
+  #         - alertname =~ "PodRestarted|OOMKilled"
+  #     - receiver: "discord"
+  #   receivers:
+  #     - name: 'null'
+  #     - name: "discord"
+  #       slack_configs:
+  #       - channel: 'prometheus_alerts'
+  #         username: "Prometheus_Alert"
+  #         #sample of discord webhook url: api_url: 'https://discord.com/api/webhooks/*******************/************************************************/slack'
+  #         api_url: 'https://discord.com/api/webhooks/1294560124735586334/y2YwN64HA8sFVZTqSJJ910xhHQ936_IErq0ckaowDmdR8AxJ7eQtyUyvX9eo9bIY-kLq/slack'
+  #     - name: "discord"
+  #       slack_configs:
+  #       - channel: 'prometheus_alerts'
+  #         username: "Prometheus_Alert"
+  #         send_resolved: false
+  #         api_url: 'https://discord.com/api/webhooks/1294560124735586334/y2YwN64HA8sFVZTqSJJ910xhHQ936_IErq0ckaowDmdR8AxJ7eQtyUyvX9eo9bIY-kLq/slack'
+  #   templates:
+  #   - '/etc/alertmanager/config/*.tmpl'

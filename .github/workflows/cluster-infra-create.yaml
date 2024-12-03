@@ -1,0 +1,206 @@
+name: Cluster infra Checks and Apply
+
+on:
+  workflow_dispatch:
+  # pull_request:
+  #   branches: [ "main" ]
+  push:
+    branches: 
+      - dev
+    paths:
+      - terraform/**
+      # - .github/workflows/checkNapply.yaml
+
+jobs:
+  Terraform-Checks:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Terraform fmt
+      id: fmt
+      run: terraform fmt -check
+
+    # Please change your secrets accordingly
+    - name: Replace backend.tf variables
+      run: |
+          sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./backend.tf
+          sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./backend.tf
+          sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./backend.tf
+          cat ./backend.tf
+          sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./data.tf
+          sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./data.tf
+          sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./data.tf
+          cat ./data.tf
+
+    - name: Replace key.tf variables
+      run: |
+          cat ./key.tf
+          sed -i 's|<EC2_PUB_KEY>|${{ secrets.EC2_PUB_KEY }}|' ./key.tf
+          # awk '{gsub(/<EC2_PUB_KEY>/, "${{ secrets.EC2_PUB_KEY }}"); print}' ./key.tf > key.temp
+          # cat ./key.temp
+          # mv ./key.temp ./key.tf
+          cat ./key.tf
+
+
+    - name: Terraform validate init
+      id: init
+      run: terraform init -backend=false
+
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate -no-color
+
+    - uses: terraform-linters/setup-tflint@v3
+      with:
+        tflint_version: latest
+    
+    - name: Show version
+      run: tflint --version
+
+    - name: Init TFLint
+      run: tflint --init
+
+    - name: Run TFLint
+      run: tflint -f compact
+
+  Terraform-Apply:
+    needs: Terraform-Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.EKS_REGION }}
+
+      # Please change your secrets accordingly
+      - name: Replace backend.tf variables
+        run: |
+            sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./backend.tf
+            sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./backend.tf
+            sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./backend.tf
+            cat ./backend.tf
+            sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./data.tf
+            sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./data.tf
+            sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./data.tf
+            cat ./data.tf
+
+      - name: Replace key.tf variables
+        run: |
+            cat ./key.tf
+            sed -i 's|<EC2_PUB_KEY>|${{ secrets.EC2_PUB_KEY }}|' ./key.tf
+            # awk '{gsub(/<EC2_PUB_KEY>/, "${{ secrets.EC2_PUB_KEY }}"); print}' ./key.tf > key.temp
+            # cat ./key.temp
+            # mv ./key.temp ./key.tf
+            cat ./key.tf
+
+      - name: Import Key
+        run: |
+            # run: echo ${{secrets.YOUR_SECRET}} | sed 's/./& /g'
+            sed -i 's/<EC2_PUB_KEY>/${{ secrets.BUCKET_KEY }}/' ./data.tf
+
+      - name: Terraform init
+        run: terraform init
+
+      # - name: Terraform target plan plan
+      #   run: terraform plan -target="aws_eks_node_group.ce7-ty-nodes"
+
+      # - name: Terraform apply
+      #   run: terraform apply -auto-approve
+
+      - name: Terraform plan
+        run: terraform plan
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve
+
+  #     - name: Export terraform outputs
+  #       id: tfout
+  #       run: |
+  #         echo "TERRA_APPLY_ROLE_ARN=$(terraform output -json | jq '."eks_role_arn".value')" >> $GITHUB_OUTPUT
+  #         echo "TERRA_APPLY_SA_NAME=$(terraform output -json | jq '."kube_sa_name".value')" >> $GITHUB_OUTPUT
+  #         echo "TERRA_APPLY_ROLE_NAMESPACE=$(terraform output -json | jq '."kube_sa_namespace".value')" >> $GITHUB_OUTPUT
+
+  #   outputs:
+  #     terra_apply_outout_role_arn: ${{ steps.tfout.outputs.TERRA_APPLY_ROLE_ARN }}
+  #     terra_apply_outout_sa_name: ${{ steps.tfout.outputs.TERRA_APPLY_SA_NAME }}
+  #     terra_apply_outout_role_namespace: ${{ steps.tfout.outputs.TERRA_APPLY_ROLE_NAMESPACE }}
+
+  #     # - name: Pause 15min to verify bucket creation
+  #     #   run: sleep 900
+
+  #     # - name: Terraform destroy
+  #     #   run: terraform destroy -auto-approve
+
+  # AWS-Roles-extraction:
+  #   needs: Terraform-Apply
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: terraform
+
+  #   steps:
+  #   - uses: actions/checkout@v3
+
+  #   - name: Configure AWS credentials
+  #     uses: aws-actions/configure-aws-credentials@v3
+  #     with:
+  #       aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+  #       aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       aws-region: ${{ vars.EKS_REGION }}
+
+  #   - name: Get kubernetes context
+  #     run: |
+  #         aws eks update-kubeconfig --name ${{ vars.EKS_NAME }} --region ${{ vars.EKS_REGION }}
+    
+  #   - name: Echo job variable from terraform
+  #     run: |
+  #         echo "This role arn: ${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_arn }}"
+  #         echo "This sa name: ${{ needs.Terraform-Apply.outputs.terra_apply_outout_sa_name }}"
+  #         echo "This is role namespace: ${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_namespace }}"
+
+  #   - name: Create kubernetes cluster special account and associate it to aws externaldns role
+  #     run: |
+  #         kubectl create serviceaccount ${{ needs.Terraform-Apply.outputs.terra_apply_outout_sa_name }}
+  #         kubectl patch serviceaccount ${{ needs.Terraform-Apply.outputs.terra_apply_outout_sa_name }} --namespace ${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_namespace }} --patch "{\"metadata\": { \"annotations\": { \"eks.amazonaws.com/role-arn\": \"${{ needs.Terraform-Apply.outputs.terra_apply_outout_role_arn }}\" }}}"
+
+  Summary:
+    needs: [Terraform-Checks, Terraform-Apply]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adding markdown
+        run: |
+          INFO1=${{ needs.Terraform-Checks.outputs.status }}
+          INFO2=${{ needs.Terraform-Apply.outputs.status }}
+
+          echo '##  Preparing Build Summary ' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo "| Job Name        | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform-Checks  | $INFO1 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform-Apply  | $INFO2 |" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo '## Job ran by: ${{ github.actor }}' >> $GITHUB_STEP_SUMMARY

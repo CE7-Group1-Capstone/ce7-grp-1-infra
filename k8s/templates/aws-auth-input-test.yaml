@@ -1,0 +1,4 @@
+  - userarn: arn:aws:iam::255945442255:user/lcchua7
+    username: lcchua7
+    groups:
+      - system:masters

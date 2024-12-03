@@ -1,0 +1,17 @@
+{
+    "Comment": "CREATE a record ",
+    "Changes": [
+        {
+        "Action": "<ACTION>",
+        "ResourceRecordSet": {
+            "Name": "<FQDN>",
+            "Type": "A",
+            "AliasTarget": {
+                "HostedZoneId": "<LB_ZONE_ID>",
+                "DNSName": "<LB_ADDR>",
+                "EvaluateTargetHealth": true
+                }
+        }
+        }
+    ]
+}

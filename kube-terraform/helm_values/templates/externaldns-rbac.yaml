@@ -1,0 +1,12 @@
+provider:
+  name: aws
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::${aws_acc_id}:role/${externaldns_role}
+
+
+# provider:
+#   name: aws
+# serviceAccount:
+#   annotations:
+#     eks.amazonaws.com/role-arn: arn:aws:iam::255945442255:role/ce7-ty-external-dns

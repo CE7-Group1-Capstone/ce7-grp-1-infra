@@ -1,0 +1,74 @@
+name: Cluster infra destroy (Scheduled@11PM and by Dispatch)
+
+# Trigger the workflow via github console
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 15 * * *'
+  # branches: 
+  #   - dev
+  # workflow_dispatch:
+    
+
+jobs:
+  terraform-destroy:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Replace backend.tf variables
+        run: |
+            sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./backend.tf
+            sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./backend.tf
+            sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./backend.tf
+            cat ./backend.tf
+            sed -i 's/<BUCKET_NAME>/${{ secrets.BUCKET_NAME }}/' ./data.tf
+            sed -i 's/<BUCKET_KEY>/${{ secrets.BUCKET_KEY }}/' ./data.tf
+            sed -i 's/<REGION>/${{ vars.EKS_REGION }}/' ./data.tf
+            cat ./data.tf
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform destroy
+        run: terraform destroy -auto-approve
+
+      - name: Print Multiple Lines
+        run: |
+          echo "Terraform destroy complete"
+          echo "Ending session..."
+
+
+  Summary:
+    needs: [terraform-destroy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adding markdown
+        run: |
+          INFO=${{ needs.terraform-destroy.outputs.status }}
+
+          echo '##  Preparing Build Summary ' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo "| Job Name        | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| terraform-destroy  | $INFO |" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          echo '## Job ran by: ${{ github.actor }}' >> $GITHUB_STEP_SUMMARY
