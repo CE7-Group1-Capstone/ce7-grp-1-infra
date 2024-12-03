@@ -88,8 +88,8 @@ variable "externaldns_info" {
     "create_ns"       = true,
     "namespace"       = "default",
     "value_path"      = "/helm_values/templates/externaldns-rbac.yaml",
-    "force_update"    = false,
-    "upgrade_install" = false
+    "force_update"    = true,
+    "upgrade_install" = true
   }
 }
 
@@ -112,8 +112,8 @@ variable "prome_info" {
     "create_ns"       = true,
     "namespace"       = "monitoring",
     "value_path"      = "/helm_values/prome-value.yaml",
-    "force_update"    = false,
-    "upgrade_install" = false
+    "force_update"    = true,
+    "upgrade_install" = true
   }
 }
 
