@@ -25,7 +25,7 @@ resource "helm_release" "prome" {
   force_update     = tobool(var.prome_info["force_update"])
   namespace        = var.prome_info["namespace"]
 
-  values = [tostring(file("${path.cwd}${var.prome_info["value_path"]}"))]
+  values = [file("${path.cwd}${var.prome_info["value_path"]}")]
 
   # set {
   #   name  = "server.persistentVolume.enabled"

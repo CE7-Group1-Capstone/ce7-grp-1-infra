@@ -11,6 +11,7 @@ grafana:
           timeout: 60
           maxLines: 1000
       url: http://ce7-grp-1-loki.monitoring.svc.cluster.local:3100
+      editable: true
     - name: CloudWatch
       type: cloudwatch
       jsonData:
