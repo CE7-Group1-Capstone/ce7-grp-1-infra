@@ -65,7 +65,7 @@ variable "helm_info" {
     #Template for helm list object ["release", "repo_url", "chart", "create namespace (boolean)", "namespace", "value_path"]
     ["ce7-grp-1-nginx", "https://kubernetes.github.io/ingress-nginx", "ingress-nginx", "false", "default", ""],
     # ["ce7-grp-1-prome", "https://prometheus-community.github.io/helm-charts", "kube-prometheus-stack", "true", "monitoring", "/helm_values/prome-value.yaml"],
-    ["ce7-grp-1-loki", "https://grafana.github.io/helm-charts", "loki-stack", "true", "monitoring", ""],
+    ["ce7-grp-1-loki", "https://grafana.github.io/helm-charts", "loki-stack", "true", "loki", ""],
   ]
 }
 
