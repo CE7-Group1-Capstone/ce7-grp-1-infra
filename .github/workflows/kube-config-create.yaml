@@ -6,7 +6,7 @@ on:
   #   branches: [ "main" ]
   push:
     branches: 
-      - dev
+      - main
     paths:
       - kube-terraform/**
       # - .github/workflows/k8s-terra.yaml
