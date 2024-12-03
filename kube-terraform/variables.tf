@@ -65,47 +65,55 @@ variable "helm_info" {
     #Template for helm list object ["release", "repo_url", "chart", "create namespace (boolean)", "namespace", "value_path"]
     ["ce7-grp-1-nginx", "https://kubernetes.github.io/ingress-nginx", "ingress-nginx", "false", "default", ""],
     # ["ce7-grp-1-prome", "https://prometheus-community.github.io/helm-charts", "kube-prometheus-stack", "true", "monitoring", "/helm_values/prome-value.yaml"],
-    ["ce7-grp-1-loki", "https://grafana.github.io/helm-charts", "loki-stack", "true", "loki", ""],
+    ["ce7-grp-1-loki", "https://grafana.github.io/helm-charts", "loki-stack", "true", "monitoring", "/helm_values/loki-value.yaml"],
   ]
 }
 
 variable "externaldns_info" {
   type = object({
-    release_name = string,
-    repo         = string,
-    chart        = string,
-    create_ns    = bool,
-    namespace    = string,
-    value_path   = string
+    release_name    = string,
+    repo            = string,
+    chart           = string,
+    create_ns       = bool,
+    namespace       = string,
+    value_path      = string,
+    force_update    = bool,
+    upgrade_install = bool
   })
 
   default = {
-    "release_name" = "external-dns",
-    "repo"         = "https://kubernetes-sigs.github.io/external-dns/",
-    "chart"        = "external-dns",
-    "create_ns"    = true,
-    "namespace"    = "default",
-    "value_path"   = "/helm_values/templates/externaldns-rbac.yaml"
+    "release_name"    = "external-dns",
+    "repo"            = "https://kubernetes-sigs.github.io/external-dns/",
+    "chart"           = "external-dns",
+    "create_ns"       = true,
+    "namespace"       = "default",
+    "value_path"      = "/helm_values/templates/externaldns-rbac.yaml",
+    "force_update"    = false,
+    "upgrade_install" = false
   }
 }
 
 variable "prome_info" {
   type = object({
-    release_name = string,
-    repo         = string,
-    chart        = string,
-    create_ns    = bool,
-    namespace    = string,
-    value_path   = string
+    release_name    = string,
+    repo            = string,
+    chart           = string,
+    create_ns       = bool,
+    namespace       = string,
+    value_path      = string,
+    force_update    = bool,
+    upgrade_install = bool
   })
 
   default = {
-    "release_name" = "ce7-grp-1-prome",
-    "repo"         = "https://prometheus-community.github.io/helm-charts",
-    "chart"        = "kube-prometheus-stack",
-    "create_ns"    = true,
-    "namespace"    = "monitoring",
-    "value_path"   = "/helm_values/prome-value.yaml"
+    "release_name"    = "ce7-grp-1-prome",
+    "repo"            = "https://prometheus-community.github.io/helm-charts",
+    "chart"           = "kube-prometheus-stack",
+    "create_ns"       = true,
+    "namespace"       = "monitoring",
+    "value_path"      = "/helm_values/prome-value.yaml",
+    "force_update"    = false,
+    "upgrade_install" = false
   }
 }
 

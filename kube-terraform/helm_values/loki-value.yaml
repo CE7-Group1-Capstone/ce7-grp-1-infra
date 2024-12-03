@@ -1,0 +1,7 @@
+loki:
+  image:
+    tag: 2.9.7
+  persistence:
+    enabled: true
+    storageClassName: # insert storage class for the data volume
+    size: 20Gi

@@ -1,9 +1,11 @@
 grafana:
-  # serviceAccount:
-    # create: true
-    # name: ${service_account_name}
-    # annotations: 
-    #   eks.amazonaws.com/role-arn: ${aws_assume_role_arn}
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: 
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
   ingress:
     enabled: true
     ingressClassName: nginx
