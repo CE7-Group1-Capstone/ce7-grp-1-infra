@@ -1,7 +1,12 @@
 # ce7-grp-1 EKS cluster
-## Brief Summary
+![ce7-grp-1-kubernetes drawio(1)](https://github.com/user-attachments/assets/fe6e6dc3-9230-45bc-8451-375906cf4f64)
+
+
+
+## Summary
 - This EKS cluster was deployed to serve as a kubernetes cluster for ce7-grp-1 MLOps project.
 - Initial design was to deploy a production and dev cluster for deployments. However, due to limitations, it is decided to only have a single cluster for this project.
+- To meet the CI/CD component of the project, there are 2 namespaces created in the cluster: _dev_ and _prod_
 - 
 ## Deployments via terraform
 | S/N | Mode of deployment | Description | Function | Artefacthub/Terraform URL |
