@@ -22,7 +22,8 @@
 
 
 ## Project Infrastructure overview
-![ce7-grp-1-kubernetes drawio(1)](https://github.com/user-attachments/assets/fe6e6dc3-9230-45bc-8451-375906cf4f64)
+![ce7-grp-1-kubernetes drawio(4)](https://github.com/user-attachments/assets/6c476502-759b-4d91-8afc-72cb40472a8b)
+
 
 ## Deployments via terraform
 | S/N | Mode of deployment | Description | Function | Artefacthub/Terraform URL |
