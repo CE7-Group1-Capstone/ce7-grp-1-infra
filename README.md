@@ -20,6 +20,7 @@
     - EKS_REGION
   - *No environment secrets or variable are considering there is only cluster required for this project.
 
+
 ## Project Infrastructure overview
 ![ce7-grp-1-kubernetes drawio(1)](https://github.com/user-attachments/assets/fe6e6dc3-9230-45bc-8451-375906cf4f64)
 
@@ -32,6 +33,7 @@
 | 4. | Helm Chart | Loki-stack | Deploys Loki to gather logs from pods within cluster | https://artifacthub.io/packages/helm/grafana/loki-stack |
 | 5. | Helm Chart (Terraform aws_eks_addon) | aws-cloudwatch-metrics | Enables Add-ons Couldwatch observability | https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_addon |
 | 6. | Helm Chart (Terraform aws_eks_addon) | metrics-server | Collects kubernetes node and pods metrics for administrator's view | https://registry.terraform.io/modules/aws-ia/eks-blueprints-addons/aws/latest |
+
 
 ## Monitoring Tools
 ### k9s
@@ -53,6 +55,7 @@ variable "user_list" {
 }
 ```
 
+
 ## Adding Helm charts deployments
 Any additional helm chart deployments can be simply added to the helm_info nested list variable located in variable.tf as show below:
 ```terraform
@@ -69,6 +72,7 @@ variable "helm_info" {
 }
 ```
 **Please take note that customized value files with static parameters can added to /helm_values/<customized_value>.yaml**
+
 
 ## The helm 
 ```terraform
@@ -89,6 +93,19 @@ resource "helm_release" "helm-install" {
 }
 ```
 
+## Learnings
+| S/N | Description | Details |
+| --- | --- | --- |
+| 1. | Create customized values,yaml | <ul><li>No need to edit the default values.yaml</li><li>Understand the paramenters in the default values.yaml and create a customized values.yaml</li><li>Customized parameters in customized value.yaml will override default values</li></ul> |
+| 2. | Kubernetes cluster user acess configmap | k8s cluster access can be manually added to the cluster's configmap. However, we would recommend enable the api and configmap access control when deploying the cluster. Doing so will simplify the access by including the IAM user in the terraform code. <ul><li><pre>access_config {<br/>  authentication_mode                         = "API_AND_CONFIG_MAP"<br/>  bootstrap_cluster_creator_admin_permissions = true<br/>}</pre><li><pre>resource "aws_eks_access_entry" "ce7-kube-access" {<br/>  cluster_name  = aws_eks_cluster.ce7-ty.name<br/>  principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.user_list[count.index]}"<br/>  type          = "STANDARD"<br/>}</pre><li><pre>resource "aws_eks_access_policy_association" "ce7-kube-access" {<br/>  cluster_name  = aws_eks_cluster.ce7-ty.name<br/>  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"<br/>  principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.user_list[count.index]}"<br/>  access_scope {<br/>    type = "cluster"<br/>  }<br/>}</pre></ul>|
+
+## Further improvement
+| S/N | Description | Purpose |
+| --- | --- | --- |
+| 1. | Incorporate discord configuration into customized value.yaml | Discord configuration to be implemented every fresh deployment |
+| 2. | Add PV and PVC for grafana and loki | Data retention even with Grafana or loki redeployed in cluster |
+| 3. | Include customized dashboards into repo. | Remove the need to reconfigure customized dashboards after every kube-prometheus-stack redeployments |
+| 4. | Implement alerts and include alert values in customized value.yaml | Include alert notifications and include alert limits in kube-prometheus-stack value.yaml |
 
 
 # Additional information on AWS EKS infrastructure terraform code
