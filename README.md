@@ -1,13 +1,28 @@
 # ce7-grp-1 EKS cluster
-![ce7-grp-1-kubernetes drawio(1)](https://github.com/user-attachments/assets/fe6e6dc3-9230-45bc-8451-375906cf4f64)
-
-
 
 ## Summary
 - This EKS cluster was deployed to serve as a kubernetes cluster for ce7-grp-1 MLOps project.
 - Initial design was to deploy a production and dev cluster for deployments. However, due to limitations, it is decided to only have a single cluster for this project.
-- To meet the CI/CD component of the project, there are 2 namespaces created in the cluster: _dev_ and _prod_
-- 
+- To cater to the CI/CD component of the project 2 namespaces created in the cluster: _dev_ and _prod_.
+- 2 main workflows are used to deploy the cluster, "Cluster infra check and apply" and "Kube config check and apply"
+  - "Cluster infra check and apply"  : Create VPC, EKS cluster, and authorize listed IAM user to access the AWS cluster
+  - "Kube config check and apply"    : Enable EKS Add-ons, Helm chart installations, and Kubectl apply of ingress rules.
+- This repo only uses the following repo secrets and repo variable:
+  - Repo Secrets:
+    - AWS_SECRET_ACCESS_ID
+    - AWS_SECRET_ACCESS_KEY
+    - BUCKET_KEY
+    - BUCKET_NAME
+    - KUBE_BUCKET_KEY
+    - KUBE_BUCKET_NAME
+    - ECR_PRI_REPO_URI
+  - Repo Variables:
+    - EKS_REGION
+  - *No environment secrets or variable are considering there is only cluster required for this project.
+
+## Project Infrastructure overview
+![ce7-grp-1-kubernetes drawio(1)](https://github.com/user-attachments/assets/fe6e6dc3-9230-45bc-8451-375906cf4f64)
+
 ## Deployments via terraform
 | S/N | Mode of deployment | Description | Function | Artefacthub/Terraform URL |
 | --- | ---  | :--- | --- | --- |
@@ -18,9 +33,15 @@
 | 5. | Helm Chart (Terraform aws_eks_addon) | aws-cloudwatch-metrics | Enables Add-ons Couldwatch observability | https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_addon |
 | 6. | Helm Chart (Terraform aws_eks_addon) | metrics-server | Collects kubernetes node and pods metrics for administrator's view | https://registry.terraform.io/modules/aws-ia/eks-blueprints-addons/aws/latest |
 
-##Monitoring Tools
-#k9s
-
+## Monitoring Tools
+### k9s
+To get a better overview of the kubernetes cluster, we would recommend using k9s to monitor and also diagnose the cluster. This terminal based UI can provide the following informations:
+- An overview of the pods in all namespaces with the resource usage of the respective pods.
+  ![image](https://github.com/user-attachments/assets/db5c8a72-472e-455a-9a49-f967f3613421)
+- Overview of the cluster status
+  ![image](https://github.com/user-attachments/assets/9d8d31bf-7e81-41ff-b8b5-5e63034b9147)
+- Pods dependencies
+  ![image](https://github.com/user-attachments/assets/15735318-65b0-4911-8590-c5a6ba4bcfb0)
 
 ## AWS IAM User EKS administrator access
 To allow AWS IAM users EKS administrator access to 
@@ -32,7 +53,45 @@ variable "user_list" {
 }
 ```
 
-# AWS EKS terraform  code
+## Adding Helm charts deployments
+Any additional helm chart deployments can be simply added to the helm_info nested list variable located in variable.tf as show below:
+```terraform
+variable "helm_info" {
+  description = "helm configurations"
+  type        = list(list(string))
+
+  default = [
+    #Template for helm list object ["release", "repo_url", "chart", "create namespace (boolean)", "namespace", "value_path"]
+    ["ce7-grp-1-nginx", "https://kubernetes.github.io/ingress-nginx", "ingress-nginx", "false", "default", ""],
+    # ["ce7-grp-1-prome", "https://prometheus-community.github.io/helm-charts", "kube-prometheus-stack", "true", "monitoring", "/helm_values/prome-value.yaml"],
+    ["ce7-grp-1-loki", "https://grafana.github.io/helm-charts", "loki-stack", "true", "loki", ""],
+  ]
+}
+```
+**Please take note that customized value files with static parameters can added to /helm_values/<customized_value>.yaml**
+
+## The helm 
+```terraform
+resource "helm_release" "helm-install" {
+  count            = length(var.helm_info)
+  upgrade_install  = true
+  force_update     = true
+  create_namespace = tobool(var.helm_info[count.index][3])
+
+  name       = var.helm_info[count.index][0]
+  repository = var.helm_info[count.index][1]
+  chart      = var.helm_info[count.index][2]
+  namespace  = var.helm_info[count.index][4]
+
+  values = (var.helm_info[count.index][5] == "" ? [] : [file("${path.cwd}${var.helm_info[count.index][5]}")])
+
+  depends_on = [time_sleep.wait_30_seconds]
+}
+```
+
+
+
+# Additional information on AWS EKS infrastructure terraform code
 ## Requirements
 
 | Name | Version |
@@ -101,7 +160,7 @@ variable "user_list" {
 | <a name="output_eks_cluster_autoscaler_arn"></a> [eks\_cluster\_autoscaler\_arn](#output\_eks\_cluster\_autoscaler\_arn) | n/a |
 
 
-# Kubernetes configuration terraform code
+# Additional information on Kubernetes configuration terraform code
 ## Requirements
 
 | Name | Version |
