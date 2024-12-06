@@ -1,4 +1,11 @@
 # ce7-grp-1 EKS cluster
+## Notice
+Please read through the following repositories before proceeding on:
+- [ML Model Training and Publishing](https://github.com/CE7-Group1-Capstone/capstone-mlops-project/blob/main/README.md)
+  - [Part A](https://github.com/CE7-Group1-Capstone/capstone-mlops-project/blob/main/docs/getting_started_clc-A.md)
+  - [Part B](https://github.com/CE7-Group1-Capstone/capstone-mlops-project/blob/main/docs/getting_started_clc-B.md)
+- [Insurance Buying Prediction Application Deployment & Rollback](https://github.com/CE7-Group1-Capstone/capstone-mlops-project/blob/main/docs/getting_started_st.md)
+- [Prometheus & Grafana SRE Monitoring Tools](https://github.com/CE7-Group1-Capstone/capstone-mlops-project/blob/main/docs/getting_started_jj.md)
 
 ## Summary
 - This EKS cluster was deployed to serve as a kubernetes cluster for ce7-grp-1 MLOps project.
@@ -108,6 +115,12 @@ resource "helm_release" "helm-install" {
 | 2. | Add PV and PVC for grafana and loki | Data retention even with Grafana or loki redeployed in cluster |
 | 3. | Include customized dashboards into repo. | Remove the need to reconfigure customized dashboards after every kube-prometheus-stack redeployments |
 | 4. | Implement alerts and include alert values in customized value.yaml | Include alert notifications and include alert limits in kube-prometheus-stack value.yaml |
+
+## Credits
+- Stephen Tan
+- Chua Lai Chwang
+- Jun Jie
+- Tan Yuan
 
 
 # Additional information on AWS EKS infrastructure terraform code
